@@ -1,0 +1,29 @@
+function metrics = computeMetrics(log,completed,collision,planningLog,cfg)
+%COMPUTEMETRICS Finite-horizon TTC and per-planning-call timing, not frame timing.
+latencies=planningLog.latencyS(min(cfg.latencyWarmupPlans,height(planningLog))+1:end);
+ttc=log.minimumTtcS; minimumTtc=min(ttc,[],'omitnan');
+if all(isnan(ttc)), minimumTtc=NaN; end
+status="timeout";
+if completed, status="goal_reached"; elseif collision, status="collision"; end
+if any(~isfinite(log{:,{'timeS','xWorldM','yWorldM','speedMps','accelerationMps2'}}),'all')
+    status="invalid";
+end
+metrics=struct('status',status,'collision',logical(collision),'completed',logical(completed), ...
+    'minimumTtcS',minimumTtc,'ttcHorizonS',cfg.horizon,'ttcUnavailableSamples',sum(isnan(ttc)), ...
+    'minimumClearanceM',min(log.minimumClearanceM),'timeToGoalS',NaN, ...
+    'durationS',log.timeS(end),'pathLengthM',sum(hypot(diff(log.xWorldM),diff(log.yWorldM))), ...
+    'averagePlannerLatencyS',mean(latencies),'p95PlannerLatencyS',percentile95(latencies), ...
+    'maximumPlannerLatencyS',maximum(latencies),'planningCalls',height(planningLog), ...
+    'latencyWarmupExcluded',min(cfg.latencyWarmupPlans,height(planningLog)), ...
+    'integratedAbsoluteJerkMps2',sum(abs(diff(log.accelerationMps2))), ...
+    'maximumCurvaturePerM',max([0;abs(log.curvaturePerM(log.speedMps>1e-6))]), ...
+    'emergencyBrakingCount',sum(diff([false;log.behavior=="EMERGENCY_BRAKE"])==1));
+if completed, metrics.timeToGoalS=log.timeS(end); end
+end
+function x=percentile95(values)
+if isempty(values), x=NaN; return; end
+values=sort(values); x=values(ceil(.95*numel(values)));
+end
+function x=maximum(values)
+if isempty(values), x=NaN; else, x=max(values); end
+end

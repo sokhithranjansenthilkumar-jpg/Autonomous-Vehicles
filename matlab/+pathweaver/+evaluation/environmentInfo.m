@@ -1,0 +1,16 @@
+function info=environmentInfo()
+%ENVIRONMENTINFO Reproducible run provenance without machine-specific paths.
+root=setupPath();
+[status,revision]=system(sprintf('git -C "%s" rev-parse HEAD',root));
+if status~=0, revision='unavailable'; end
+[status,changes]=system(sprintf('git -C "%s" status --porcelain',root));
+info=struct('revision',string(strtrim(revision)),'dirty',status~=0 || ~isempty(strtrim(changes)), ...
+    'matlabVersion',string(version),'release',string(version('-release')), ...
+    'architecture',string(computer('arch')),'products',ver, ...
+    'createdUtc',string(datetime('now','TimeZone','UTC','Format','yyyy-MM-dd HH:mm:ss z')));
+active=license('inuse'); info.activeLicenseFeatures=string({active.feature});
+names={'RandStream','VideoWriter','getframe','drivingScenario','roadrunner', ...
+    'sim','sfroot','Stateflow.Chart','Simulink.SimulationInput'};
+info.availableApis=cell2struct(cellfun(@(n)~isempty(which(n)),names,'UniformOutput',false), ...
+    matlab.lang.makeValidName(names),2);
+end
